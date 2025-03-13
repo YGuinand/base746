@@ -40,23 +40,24 @@ void testLvgl()
 #ifdef ARDUINO
 
 #include "lvglDrivers.h"
+#include "STM32SD.h"
 
-// à décommenter pour tester la démo
-// #include "demos/lv_demos.h"
+// // à décommenter pour tester la démo
+// // #include "demos/lv_demos.h"
 
-void mySetup()
-{
-  // à décommenter pour tester la démo
-  // lv_demo_widgets();
+// void mySetup()
+// {
+//   // à décommenter pour tester la démo
+//   // lv_demo_widgets();
 
-  // Initialisations générales
-  testLvgl();
-}
+//   // Initialisations générales
+//   testLvgl();
+// }
 
-void loop()
-{
-  // Inactif (pour mise en veille du processeur)
-}
+// void loop()
+// {
+//   // Inactif (pour mise en veille du processeur)
+// }
 
 void myTask(void *pvParameters)
 {
@@ -72,6 +73,80 @@ void myTask(void *pvParameters)
     // ici 200ms, donc la tâche s'effectue toutes les 200ms
     vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(200)); // toutes les 200 ms
   }
+}
+
+
+Sd2Card card;
+SdFatFs fatFs;
+
+void mySetup() {
+  testLvgl();
+
+  bool disp = false;
+
+  Serial.print("\nInitializing SD card...");
+  while(!card.init(SD_DETECT_PIN)) {
+    if (!disp) {
+      Serial.println("initialization failed. Is a card inserted?");
+      disp = true;
+    }
+    delay(10);
+  }
+
+  Serial.println("A card is present.");
+
+  // print the type of card
+  Serial.print("\nCard type: ");
+  switch (card.type()) {
+    case SD_CARD_TYPE_SD1:
+      Serial.println("SD1");
+      break;
+    case SD_CARD_TYPE_SD2:
+      Serial.println("SD2");
+      break;
+    case SD_CARD_TYPE_SDHC:
+      Serial.println("SDHC");
+      break;
+    default:
+      Serial.println("Unknown");
+  }
+
+  // Now we will try to open the 'volume'/'partition' - it should be FAT16 or FAT32
+  if (!fatFs.init()) {
+    Serial.println("Could not find FAT16/FAT32 partition.\nMake sure you've formatted the card");
+    return;
+  }
+
+  // print the type and size of the first FAT-type volume
+  uint64_t volumesize;
+  Serial.print("\nVolume type is FAT");
+  Serial.println(fatFs.fatType(), DEC);
+  Serial.println();
+
+  volumesize = fatFs.blocksPerCluster();    // clusters are collections of blocks
+  volumesize *= fatFs.clusterCount();       // we'll have a lot of clusters
+  volumesize *= 512;                        // SD card blocks are always 512 bytes
+  Serial.print("Volume size (bytes): ");
+  Serial.println(volumesize);
+  Serial.print("Volume size (Kbytes): ");
+  volumesize /= 1024;
+  Serial.println(volumesize);
+  Serial.print("Volume size (Mbytes): ");
+  volumesize /= 1024;
+  Serial.println(volumesize);
+
+
+  Serial.println("\nFiles found on the card (name, date and size in bytes): ");
+  File root = SD.openRoot();
+
+  // list all files in the card with date and size
+  root.ls(LS_R | LS_DATE | LS_SIZE);
+  root.close();
+  Serial.println("###### End of the SD tests ######");
+}
+
+void loop(void) {
+  // do nothing
 }
 
 #else
